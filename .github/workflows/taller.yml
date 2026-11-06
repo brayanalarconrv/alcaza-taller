@@ -1,0 +1,39 @@
+name: Taller de mockups
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: taller
+  cancel-in-progress: false
+jobs:
+  taller:
+    runs-on: ubuntu-latest
+    timeout-minutes: 58
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: ¿Hay trabajo en la fila?
+        id: r
+        run: node estacion.mjs revisar
+        env:
+          TALLER_CLAVE: ${{ secrets.TALLER_CLAVE }}
+      - name: Preparar Chrome
+        if: steps.r.outputs.hay == '1'
+        run: npm install --no-save --no-audit --no-fund playwright-core@1.48.2
+      - name: Hacer los mockups
+        if: steps.r.outputs.hay == '1'
+        run: node estacion.mjs
+        env:
+          TALLER_CLAVE: ${{ secrets.TALLER_CLAVE }}
+      - name: Mantener vivo el horario (GitHub lo apaga tras 60 días sin cambios)
+        if: github.event_name == 'schedule'
+        run: |
+          if [ $(( $(date +%s) - $(git log -1 --format=%ct) )) -gt 4300000 ]; then
+            git config user.name "Robot del taller"; git config user.email "taller@users.noreply.github.com"
+            date -u > .vivo; git add .vivo; git commit -m "Taller activo"; git push
+          fi
